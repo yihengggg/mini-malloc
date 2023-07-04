@@ -10,6 +10,7 @@ static void *coalesce(void *bp);
 
 static void *find_fit(size_t asize);
 void *first_fit(size_t asize);
+void *next_fit(size_t asize);
 void *best_fit(size_t asize);
 static void place(void *bp, size_t asize);
 

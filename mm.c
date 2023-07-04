@@ -57,7 +57,8 @@
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp)-WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-DSIZE)))
 
-static void *heap_listp;  // 空闲链表头结点
+static char *heap_listp;  // 空闲链表头结点
+static char *pre_listp;  // 用于next fit
 
 /*
  * mm_init - initialize the malloc package.
@@ -147,14 +148,16 @@ void *mm_malloc(size_t size) {
  */
 static void *find_fit(size_t asize) {
   /* First-fit search */
-  return first_fit(asize);
+  // return first_fit(asize);
+  return next_fit(asize);
+  // return best_fit(asize);
 }
 
 /*
  * first_fit - 首次匹配
  */
 void *first_fit(size_t asize) {
-  void *bp;
+  char *bp;
   // 遍历空闲链表，找到合适的空闲块就停止遍历
   for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
     if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
@@ -165,11 +168,32 @@ void *first_fit(size_t asize) {
 }
 
 /*
+ * next_fit - 下一次匹配
+ */
+void *next_fit(size_t asize) {
+  // 从上一次查找的地方开始
+  for (char *bp = pre_listp; GET_SIZE(HDRP(bp)); bp = NEXT_BLKP(bp)) {
+    if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+      pre_listp = bp;
+      return bp;
+    }
+  }
+  // 若遍历完空闲链表都没找到，就从头开始
+  for (char *bp = heap_listp; bp != pre_listp; bp = NEXT_BLKP(bp)) {
+    if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+      pre_listp = bp;
+      return bp;
+    }
+  }
+  return NULL;
+}
+
+/*
  * best_fit - 最优匹配
  */
 void *best_fit(size_t asize) {
-  void *bp;
-  void *best_bp = NULL;
+  char *bp;
+  char *best_bp = NULL;
   size_t min_size = 0;
   // 遍历完空闲链表，找到最合适的空闲块
   for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
@@ -255,20 +279,27 @@ static void *coalesce(void *bp) {
 }
 
 /*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ * mm_realloc - 改变一个已分配块的大小
  */
 void *mm_realloc(void *ptr, size_t size) {
   void *oldptr = ptr;
   void *newptr;
   size_t copySize;
 
+  // 使用 mm_malloc 申请一个新内存块
   newptr = mm_malloc(size);
   if (newptr == NULL)
     return NULL;
-  copySize = *(size_t * )((char *) oldptr - SIZE_T_SIZE);
+  
+  size = GET_SIZE(HDRP(oldptr));
+  copySize = GET_SIZE(HDRP(newptr));
   if (size < copySize)
     copySize = size;
-  memcpy(newptr, oldptr, copySize);
+  
+  // 将旧内存块的内容复制到新内存块上
+  memcpy(newptr, oldptr, copySize-WSIZE);
+
+  // 释放旧内存块
   mm_free(oldptr);
   return newptr;
 }

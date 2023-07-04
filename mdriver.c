@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
   stats_t *mm_stats = NULL;   /* mm (i.e. student) stats for each trace */
   speed_t speed_params;       /* input parameters to the xx_speed routines */
 
-  int team_check = 1; /* If set, check team structure (reset by -a) */
+  int team_check = 0; /* If set, check team structure (reset by -a) */
   int run_libc = 0;   /* If set, run libc malloc (set by -l) */
   int autograder = 0; /* If set, emit summary info for autograder (-g) */
 

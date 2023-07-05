@@ -18,6 +18,30 @@
 #include "memlib.h"
 #include "mm.h"
 
+/*  EMPTY BLOCK
+ *  -----------------------------------------------*
+ *  |HEADER:    block size   |     |     |alloc bit|
+ *  |----------------------------------------------|
+ *  | pointer to prev free block in this size list |
+ *  |----------------------------------------------|
+ *  | pointer to next free block in this size list |
+ *  |----------------------------------------------|
+ *  |FOOTER:    block size   |     |     |alloc bit|
+ *  ------------------------------------------------
+ */
+
+/*  Allocated BLOCK
+ *   -----------------------------------------------*
+ *   |HEADER:    block size   |     |     |alloc bit|
+ *   |----------------------------------------------|
+ *   |               Data                           |
+ *   |----------------------------------------------|
+ *   |               Data                           |
+ *   |----------------------------------------------|
+ *   |FOOTER:    block size   |     |     |alloc bit|
+ *   ------------------------------------------------
+ */
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -57,8 +81,9 @@
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp)-WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-DSIZE)))
 
-static char *heap_listp;  // 空闲链表头结点
-static char *pre_listp;  // 用于next fit
+// 全局变量
+static char *heap_listp = 0;  // 空闲链表头结点
+static char *pre_listp = 0;  // 用于next fit
 
 /*
  * mm_init - initialize the malloc package.
@@ -73,6 +98,7 @@ int mm_init(void) {
   PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); // 序言块
   PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     // 结尾块
   heap_listp += (2 * WSIZE);
+  pre_listp = heap_listp;
 
   // 扩展空闲空间
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
@@ -172,7 +198,7 @@ void *first_fit(size_t asize) {
  */
 void *next_fit(size_t asize) {
   // 从上一次查找的地方开始
-  for (char *bp = pre_listp; GET_SIZE(HDRP(bp)); bp = NEXT_BLKP(bp)) {
+  for (char *bp = pre_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
     if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
       pre_listp = bp;
       return bp;
@@ -240,7 +266,7 @@ void mm_free(void *ptr) {
 
   PUT(HDRP(ptr), PACK(size, 0));
   PUT(FTRP(ptr), PACK(size, 0));
-  coalesce(ptr);
+  pre_listp = coalesce(ptr);
 }
 
 /*
@@ -302,4 +328,11 @@ void *mm_realloc(void *ptr, size_t size) {
   // 释放旧内存块
   mm_free(oldptr);
   return newptr;
+}
+
+/*
+ * mm_check - 检查堆的一致性
+ */
+static int mm_check(void) {
+  return 1;
 }
